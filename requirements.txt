@@ -1,0 +1,4 @@
+# Python 3.9+ (tested on 3.11)
+biopython>=1.81
+networkx>=3.1
+numpy>=1.24

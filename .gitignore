@@ -1,0 +1,10 @@
+# results
+output/
+
+# python
+.venv/
+__pycache__/
+*.py[co]
+
+# generated java config (machine specific)
+epiSCANEER/coe/generated_conf/
