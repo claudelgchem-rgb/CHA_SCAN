@@ -116,8 +116,9 @@ def parse_hits(job, out_dir):
     for h in data["hits"]:
         iterations.add(h.get("hit_iter"))
         ident = max(x["hsp_identity"] for x in h["hit_hsps"])
+        best_evalue = min(x["hsp_expect"] for x in h["hit_hsps"])
         worst_evalue = max(worst_evalue, max(x["hsp_expect"] for x in h["hit_hsps"]))
-        hits.append((h["hit_id"], h["hit_len"], ident))
+        hits.append((h["hit_id"], h["hit_len"], ident, best_evalue))
     meta["hit_count"] = len(hits)
     meta["iterations_present"] = sorted(i for i in iterations if i)
     meta["worst_evalue"] = worst_evalue
@@ -174,6 +175,10 @@ def main():
     p.add_argument("--jobid", help="reuse an existing EBI job instead of submitting")
     p.add_argument("--workdir", default=".")
     p.add_argument("--report")
+    p.add_argument("--top-n", type=int,
+                   help="keep only the N most significant hits after the paper's "
+                        "filters. The paper imposes no cap, so this is a recorded "
+                        "deviation and must be requested explicitly.")
     args = p.parse_args()
 
     os.makedirs(args.workdir, exist_ok=True)
@@ -198,7 +203,7 @@ def main():
 
     log("4. applying the paper's filters")
     kept, drop_len, drop_id, drop_self = [], 0, 0, 0
-    for cid, hit_len, ident in hits:
+    for cid, hit_len, ident, evalue in hits:
         if cid == "UniRef90_%s" % args.accession:
             drop_self += 1
             continue
@@ -208,23 +213,38 @@ def main():
         if ident >= MAX_IDENTITY:
             drop_id += 1
             continue
-        kept.append((cid, hit_len, ident))
+        kept.append((cid, hit_len, ident, evalue))
     log("   query's own cluster removed: %d" % drop_self)
     log("   outside the %.1f-%.1f length window: %d" % (lo, hi, drop_len))
     log("   with >=%.0f%% identity to the query: %d" % (MAX_IDENTITY, drop_id))
     log("   homologs kept: %d" % len(kept))
 
+    if args.top_n:
+        # DEVIATION from the paper, on the user's explicit instruction: the
+        # paper imposes no cap. The homologs are truncated to the most
+        # significant PSI-BLAST hits, which is the search's own ranking - no
+        # new selection criterion is introduced.
+        before = len(kept)
+        kept.sort(key=lambda r: (r[3], -r[2]))
+        kept = kept[:args.top_n]
+        log("   DEVIATION: truncated to the %d most significant hits (from %d)"
+            % (len(kept), before))
+        log("   e-value range kept: %.3g .. %.3g" % (kept[0][3], kept[-1][3]))
+        idents = sorted(r[2] for r in kept)
+        log("   identity to query: %.1f%% .. %.1f%% (median %.1f%%)"
+            % (idents[0], idents[-1], idents[len(idents) // 2]))
+
     log("5. collecting hit sequences")
-    seqs = fetch_hit_sequences(job, args.workdir, [c for c, _, _ in kept])
+    seqs = fetch_hit_sequences(job, args.workdir, [r[0] for r in kept])
     final, no_seq, len_mismatch = [], 0, 0
-    for cid, hit_len, ident in kept:
+    for cid, hit_len, ident, evalue in kept:
         s = seqs.get(cid)
         if not s:
             no_seq += 1
             continue
         if len(s) != hit_len:
             len_mismatch += 1
-        final.append((cid, s, ident))
+        final.append((cid, s, ident, evalue))
     if no_seq:
         log("   WARNING: %d kept clusters had no retrievable sequence" % no_seq)
     if len_mismatch:
@@ -233,12 +253,12 @@ def main():
 
     if args.report:
         with open(args.report, "w") as f:
-            print("uniref90_cluster\tlength\tpercent_identity_to_query", file=f)
-            for cid, s, ident in final:
-                print("%s\t%d\t%.1f" % (cid, len(s), ident), file=f)
+            print("uniref90_cluster\tlength\tpercent_identity_to_query\tevalue", file=f)
+            for cid, s, ident, evalue in final:
+                print("%s\t%d\t%.1f\t%.3g" % (cid, len(s), ident, evalue), file=f)
 
     records = [SeqRecord(Seq(query), id=args.prefix, description="")]
-    records += [SeqRecord(Seq(s), id=cid, description="") for cid, s, _ in final]
+    records += [SeqRecord(Seq(s), id=cid, description="") for cid, s, _, _ in final]
     fasta_in = os.path.join(args.workdir, "%s_psiblast_hits.fasta" % args.prefix)
     SeqIO.write(records, fasta_in, "fasta")
 
