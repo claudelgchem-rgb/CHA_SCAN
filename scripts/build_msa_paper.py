@@ -88,58 +88,81 @@ def wait(job, poll=30):
 
 
 def parse_hits(job, out_dir):
-    """Return {cluster_id: best percent identity to the query}, in hit order."""
-    types = http(EBI + "/resulttypes/" + job)
-    available = re.findall(r"<identifier>([^<]+)</identifier>", types)
-    log("  result types: %s" % ", ".join(available))
+    """Hits of the PSI-BLAST run, from the service's JSON result.
 
-    raw = http(EBI + "/result/%s/out" % job, timeout=600)
-    open(os.path.join(out_dir, "psiblast_out.txt"), "w").write(raw)
+    Returns a list of (cluster_id, subject_length, percent_identity) in hit
+    order, plus the run's metadata for the report.
+    """
+    raw = http(EBI + "/result/%s/json" % job, timeout=1800)
+    path = os.path.join(out_dir, "psiblast.json")
+    open(path, "w").write(raw)
+    data = json.loads(raw)
 
-    ids_text = ""
-    if "ids" in available:
-        ids_text = http(EBI + "/result/%s/ids" % job, timeout=600)
-        open(os.path.join(out_dir, "psiblast_ids.txt"), "w").write(ids_text)
+    meta = {
+        "program": "%s %s" % (data["program"], data["version"]),
+        "database": data["dbs"],
+        "db_num": data["db_num"],
+        "expect_upper": data["expect_upper"],
+        "matrix": data["matrix"],
+        "gap_open": data["gap_open"],
+        "gap_extend": data["gap_extend"],
+        "filter": data["filter"],
+        "alignments_requested": data["alignments"],
+        "query_len": data["query_len"],
+    }
+    hits = []
+    iterations = set()
+    worst_evalue = 0.0
+    for h in data["hits"]:
+        iterations.add(h.get("hit_iter"))
+        ident = max(x["hsp_identity"] for x in h["hit_hsps"])
+        worst_evalue = max(worst_evalue, max(x["hsp_expect"] for x in h["hit_hsps"]))
+        hits.append((h["hit_id"], h["hit_len"], ident))
+    meta["hit_count"] = len(hits)
+    meta["iterations_present"] = sorted(i for i in iterations if i)
+    meta["worst_evalue"] = worst_evalue
+    meta["hit_cap_reached"] = len(hits) >= int(data["alignments"])
+    return hits, meta
 
-    # Identities come from the tab-delimited or textual report; both are kept
-    # on disk so the parse can be audited.
-    hits = {}
-    order = []
-    # "UniRef90_XXXX ... <bits> <evalue> ... <identity>%" lines of the
-    # NCBI-style summary table are parsed generically: take every cluster id
-    # seen in the pairwise section together with its "Identities = a/b (c%)".
-    blocks = re.split(r"\n(?=>)", raw)
-    for block in blocks[1:]:
-        m = re.match(r">\s*(UniRef90_\S+)", block)
-        if not m:
-            continue
-        cid = m.group(1)
-        idents = [float(x) for x in re.findall(r"Identities\s*=\s*\d+/\d+\s*\((\d+)%\)", block)]
-        if not idents:
-            continue
-        if cid not in hits:
-            order.append(cid)
-        hits[cid] = max(hits.get(cid, 0.0), max(idents))
-    return hits, order
 
+def fetch_hit_sequences(job, out_dir, wanted):
+    """Full subject sequences, from the run's own database snapshot.
 
-def fetch_uniref_sequences(cluster_ids, batch=80):
-    """Representative sequence of each UniRef90 cluster."""
-    seqs = {}
-    for i in range(0, len(cluster_ids), batch):
-        chunk = cluster_ids[i:i + batch]
-        q = " OR ".join("id:%s" % c for c in chunk)
-        url = "%s/uniref/stream?query=%s&format=fasta" % (UNIPROT, urllib.parse.quote(q))
-        text = http(url, timeout=600)
-        cur = None
-        for line in text.splitlines():
-            if line.startswith(">"):
-                cur = line[1:].split()[0]
-                seqs[cur] = []
-            elif cur:
-                seqs[cur].append(line.strip())
-        log("  fetched %d / %d clusters" % (min(i + batch, len(cluster_ids)), len(cluster_ids)))
-    return {k: "".join(v) for k, v in seqs.items()}
+    The service's `preselected_seq` result carries the hit sequences as
+    searched, so they need no second retrieval. Anything it omits is pulled
+    from the UniProt UniRef endpoint.
+    """
+    raw = http(EBI + "/result/%s/preselected_seq" % job, timeout=1800)
+    open(os.path.join(out_dir, "psiblast_hit_sequences.fasta"), "w").write(raw)
+
+    seqs, cur = {}, None
+    for line in raw.splitlines():
+        if line.startswith(">"):
+            name = line[1:].split()[0]
+            cur = name.split(":", 1)[1] if ":" in name else name
+            seqs[cur] = []
+        elif cur:
+            seqs[cur].append(line.strip())
+    seqs = {k: "".join(v) for k, v in seqs.items()}
+    log("   %d sequences from the run's own result" % len(seqs))
+
+    missing = [c for c in wanted if c not in seqs]
+    if missing:
+        log("   fetching %d missing clusters from UniProt" % len(missing))
+        for i in range(0, len(missing), 80):
+            chunk = missing[i:i + 80]
+            q = " OR ".join("id:%s" % c for c in chunk)
+            url = "%s/uniref/stream?query=%s&format=fasta" % (UNIPROT, urllib.parse.quote(q))
+            cur, parts = None, {}
+            for line in http(url, timeout=600).splitlines():
+                if line.startswith(">"):
+                    cur = line[1:].split()[0]
+                    parts[cur] = []
+                elif cur:
+                    parts[cur].append(line.strip())
+            for k, v in parts.items():
+                seqs[k] = "".join(v)
+    return seqs
 
 
 def main():
@@ -166,42 +189,56 @@ def main():
     wait(job)
 
     log("3. parsing hits")
-    idents, order = parse_hits(job, args.workdir)
-    log("   hits reported: %d" % len(order))
+    hits, meta = parse_hits(job, args.workdir)
+    log("   hits reported: %d (cap %s, reached: %s)"
+        % (meta["hit_count"], meta["alignments_requested"], meta["hit_cap_reached"]))
+    log("   iterations present: %s | worst e-value: %s"
+        % (meta["iterations_present"], meta["worst_evalue"]))
+    json.dump(meta, open(os.path.join(args.workdir, "psiblast_meta.json"), "w"), indent=1)
 
-    log("4. fetching UniRef90 representative sequences")
-    seqs = fetch_uniref_sequences(order)
-    missing = [c for c in order if c not in seqs]
-    if missing:
-        log("   WARNING: %d clusters returned no sequence (%s...)" % (missing.__len__(), missing[:3]))
-
-    log("5. applying the paper's filters")
-    kept, drop_len, drop_id = [], 0, 0
-    for cid in order:
-        s = seqs.get(cid)
-        if not s:
-            continue
+    log("4. applying the paper's filters")
+    kept, drop_len, drop_id, drop_self = [], 0, 0, 0
+    for cid, hit_len, ident in hits:
         if cid == "UniRef90_%s" % args.accession:
-            continue                      # the query's own cluster
-        if not lo <= len(s) <= hi:
+            drop_self += 1
+            continue
+        if not lo <= hit_len <= hi:
             drop_len += 1
             continue
-        if idents[cid] >= MAX_IDENTITY:
+        if ident >= MAX_IDENTITY:
             drop_id += 1
             continue
-        kept.append((cid, s, idents[cid]))
-    log("   dropped outside length window: %d" % drop_len)
-    log("   dropped with >=%.0f%% identity to query: %d" % (MAX_IDENTITY, drop_id))
+        kept.append((cid, hit_len, ident))
+    log("   query's own cluster removed: %d" % drop_self)
+    log("   outside the %.1f-%.1f length window: %d" % (lo, hi, drop_len))
+    log("   with >=%.0f%% identity to the query: %d" % (MAX_IDENTITY, drop_id))
     log("   homologs kept: %d" % len(kept))
+
+    log("5. collecting hit sequences")
+    seqs = fetch_hit_sequences(job, args.workdir, [c for c, _, _ in kept])
+    final, no_seq, len_mismatch = [], 0, 0
+    for cid, hit_len, ident in kept:
+        s = seqs.get(cid)
+        if not s:
+            no_seq += 1
+            continue
+        if len(s) != hit_len:
+            len_mismatch += 1
+        final.append((cid, s, ident))
+    if no_seq:
+        log("   WARNING: %d kept clusters had no retrievable sequence" % no_seq)
+    if len_mismatch:
+        log("   WARNING: %d sequences differ in length from the BLAST record" % len_mismatch)
+    log("   sequences available for the MSA: %d" % len(final))
 
     if args.report:
         with open(args.report, "w") as f:
             print("uniref90_cluster\tlength\tpercent_identity_to_query", file=f)
-            for cid, s, ident in kept:
-                print("%s\t%d\t%.0f" % (cid, len(s), ident), file=f)
+            for cid, s, ident in final:
+                print("%s\t%d\t%.1f" % (cid, len(s), ident), file=f)
 
     records = [SeqRecord(Seq(query), id=args.prefix, description="")]
-    records += [SeqRecord(Seq(s), id=cid, description="") for cid, s, _ in kept]
+    records += [SeqRecord(Seq(s), id=cid, description="") for cid, s, _ in final]
     fasta_in = os.path.join(args.workdir, "%s_psiblast_hits.fasta" % args.prefix)
     SeqIO.write(records, fasta_in, "fasta")
 
