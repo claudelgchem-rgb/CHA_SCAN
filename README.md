@@ -80,6 +80,34 @@ enzyme on a modern laptop.
      + ```*.doubleSCI_mp``` - Raw epiSCI scores of every candidate residue substitution pair.
      + ```*.txt``` - A text file containing final epiSCI scores of mutations (best-scoring substitution per co-evolving residue pair, with a min-max normalised ```SCI_norm``` column).
 
+## Helper scripts
+---
+Two scripts in `scripts/` prepare inputs and interpret outputs. They are
+additions to this copy, not part of upstream epiSCANEER.
+
+`scripts/build_msa.py` builds an input alignment for any UniProt protein:
+it fetches the query, downloads its Pfam family from UniProtKB, scores every
+member against the query by local alignment, filters on coverage/identity,
+removes near-duplicates, aligns the survivors with the bundled MUSCLE and
+writes CLUSTAL with the query first (as epiSCANEER requires).
+```
+python scripts/build_msa.py --accession P38567 --pfam PF01630 \
+    --prefix PH20 --out input/PH20.aln --target 300 \
+    --report input/PH20_homologs.tsv
+```
+
+`scripts/annotate_ph20.py` annotates the PH20 results with mature-protein
+numbering, region (signal peptide / rHuPH20 / GPI tail), distance to the
+catalytic Glu148 measured on PDB 9JUB, and disulfide / N-glycosylation
+flags, and writes a shortlist restricted to the secreted enzyme.
+```
+python scripts/annotate_ph20.py
+```
+
+`input/PH20.aln` (301 sequences of glycoside hydrolase family 56, human
+PH-20 as query) and `input/PH20_homologs.tsv` are the alignment produced
+this way.
+
 ## Changes made to run the upstream code
 ---
 The upstream sources are half-way through a Python 2 -> 3 migration and do not
