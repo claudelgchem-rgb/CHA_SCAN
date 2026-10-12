@@ -35,3 +35,5 @@ patent position mature 70 (I70A reported ~27-fold)	not in the network	not in the
 patent position mature 271 (I271L reported)	7 pairs, best rank 18	not in the network
 patent position mature 309	3 pairs, best rank 60	3 pairs, best rank 194
 patent position mature 324	1 pair, best rank 100	not in the network
+
+consensus set	33 residue pairs appear in the top 500 of both runs; 12 of them also agree on the recommended amino acids; 16 lie within 10 A of Glu148. Listed in CONSENSUS_top500_33pairs.tsv with the rank each pair holds in both runs.
