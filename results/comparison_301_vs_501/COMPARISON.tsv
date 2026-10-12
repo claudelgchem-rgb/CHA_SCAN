@@ -1,0 +1,37 @@
+metric	301-sequence MSA (ad-hoc homolog selection)	501-sequence MSA (paper protocol, top 500 by e-value)
+homolog selection	Pfam PF01630 download, pairwise local alignment scoring, >=70% coverage, 30-95% identity, <=90% mutual identity, seeded random shuffle, first 300 kept	PSI-BLAST vs UniRef90, single iteration, e-value 0.001, length 0.7-1.3x query, <90% identity to query, truncated to the 500 most significant hits
+sequences in MSA	301	501
+alignment columns	1146	1301
+gap fraction of the alignment	58.8%	61.4%
+homolog identity to query (median)	44.4%	54.1%
+homolog identity to query (range)	32.6-89.7%	42.0-89.6%
+homologs in the 40-50% identity band	241 of 300	191 of 500
+homolog sets shared between the two runs	20 sequences	20 sequences
+filtered alignment length L used by McBASC	427	451
+McBASC residue pairs scored	90,951	101,475
+McBASC score rank correlation on the 84,666 common pairs	Spearman 0.227	Spearman 0.227
+co-evolutionary network size	1018 edges (fixed at 2 x query length 509)	1018 edges (fixed at 2 x query length 509)
+network edges shared between the two runs	78 of 1018 (7.7%)	78 of 1018 (7.7%)
+residue positions appearing in the network	248	227
+positions shared between the two runs	161	161
+shortlist size after structural exclusions	928 of 1018	978 of 1018
+rank overlap, top 10	1 of 10	1 of 10
+rank overlap, top 50	4 of 50	4 of 50
+rank overlap, top 100	8 of 100	8 of 100
+rank overlap, top 500	33 of 500	33 of 500
+rank correlation on the 78 common edges	Spearman 0.485	Spearman 0.485
+SCI_norm at rank 50	0.8084	0.7226
+SCI_norm at rank 100	0.7802	0.6741
+SCI_norm median	0.6612	0.5554
+raw MUT_SCI maximum	0.11190	0.25144
+top-100 hub residues (mature numbering)	M35 (14 pairs), V351 (13), L165 (9), F204 (9), S22 (8)	L165 (39 pairs), A267 (19), N2 (4), F380 (3), E156 (3)
+share of the top-100 slots taken by the five biggest hubs	26% (53 of 200)	34% (68 of 200)
+distinct residues in the top 100	87	94
+pairs within 10 A of Glu148, whole shortlist	372 of 928 (40%)	298 of 978 (30%)
+pairs within 10 A of Glu148, top 100	13	47
+pairs within 10 A of Glu148, top 50	10	35
+patent position mature 69 (S69A reported ~22-fold)	not in the network	not in the network
+patent position mature 70 (I70A reported ~27-fold)	not in the network	not in the network
+patent position mature 271 (I271L reported)	7 pairs, best rank 18	not in the network
+patent position mature 309	3 pairs, best rank 60	3 pairs, best rank 194
+patent position mature 324	1 pair, best rank 100	not in the network
