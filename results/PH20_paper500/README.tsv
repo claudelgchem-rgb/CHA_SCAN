@@ -1,0 +1,28 @@
+Target	Hyaluronidase PH-20 / SPAM1, Homo sapiens, UniProt P38567, 509 aa
+Regions	signal peptide 1-35 | secreted rHuPH20 36-482 | GPI tail 483-509
+Catalytic residue	Glu148 (proton donor, UniProt annotation)
+Method	epiSCANEER (McBASC co-evolution network + epistatic SCI), github.com/khsub87/epiSCANEER; protocol of Nucleic Acids Research 2026, 54, gkag879
+Homolog search	PSI-BLAST 2.14.0+ against UniRef90 (121,494,192 sequences, 2026-08-27 snapshot), single iteration, e-value threshold 0.001, BLOSUM62, gap 11/1, filter off. EBI job psiblast-R20260918-045739-0735-13029743-p1m. 4679 hits, worst e-value 0.00091; the service's 5000-hit cap was not reached.
+Paper's filters	minus the query's own UniRef90 cluster; minus 1009 hits outside 0.7-1.3x the query length (356.3-661.7); minus 0 hits with >=90% identity to the query -> 3669 homologs
+DEVIATION	The paper imposes no cap on homolog count. On the user's instruction the 3669 homologs were truncated to the 500 most significant PSI-BLAST hits (e-value ranking, the search's own ordering). Kept identity 42.0-89.6%, median 54.1%, 328 distinct taxa. Reason: MUSCLE with default parameters needs ~7.1 h per refinement iteration at 3670 sequences (measured), with up to 14 iterations at the default -maxiters 16.
+Alignment	MUSCLE with ClustalW output and default parameters, as the paper specifies. 501 sequences (query + 500), 1301 columns, 1.8 min. Input: input/PH20_paper500.aln
+Structure reference	PDB 9JUB chain A (PH20 residues 37-442, deposited in P38567 numbering; verified residue-by-residue, 406/406 match)
+Source rows	978 residue pairs, from 1018 predicted pairs after removing pairs that touch a disulfide cysteine, an N-glycosylation site or the catalytic Glu148
+Ranking	SCI_norm, the min-max normalised epiSCI score. Structure distance and the region/flag columns are external annotations and do NOT enter the ranking.
+Numbering	P38567 = full-length precursor. mature / rHuPH20 = precursor position - 35, the numbering used in the rHuPH20 patent literature.
+
+Column definitions	
+pos1 / pos2	Co-evolving residue pair, P38567 numbering
+mature_pos1 / 2	Same pair in mature-protein numbering (= pos - 35)
+WT_AA / MUT_AA	Wild-type residue and the substitution epiSCANEER recommends
+WT_freq	Frequency of the wild-type residue pair across the 501-sequence alignment
+MUT_SCI	Raw epiSCI score of the substitution pair
+SCI_norm	MUT_SCI min-max normalised over all scored substitutions (0-1)
+dist_to_E148	Minimum heavy-atom distance from the residue to catalytic Glu148, in angstrom, measured on PDB 9JUB. Blank when the residue is outside the modelled 37-442 range.
+Near active site	Y when either residue lies within 10 A of Glu148. Those rows are shaded.
+
+Caveats	epiSCI ranks epistatic co-evolutionary support, NOT measured activity. All entries are DOUBLE mutants; the method does not score single mutations. Position L200 (mature L165) appears in 39 of the top 100 pairs, so the head of the list is dominated by one hub residue. Every candidate requires experimental validation.
+Run-to-run stability	Only 8% of the top 100 pairs are shared with an earlier 301-sequence run built by a different homolog-selection method, so the ranking depends heavily on MSA composition.
+Literature check	Of the PH20 positions reported as activity-enhancing in the patent literature (mature 69, 70, 271, 309, 324), this run recovers only 309, at rank 194.
+Reproducing	./setup.sh then: .venv/bin/python run_epiSCANEER.py <dir with PH20.aln> <output dir>, where PH20.aln is a copy of input/PH20_paper500.aln. Then scripts/annotate_ph20.py and scripts/make_report_xlsx.py.
+Generated	epiSCANEER run of 2026-10-12 (identical byte sizes to the 2026-09-18 run)

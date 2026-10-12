@@ -8,4 +8,6 @@ __pycache__/
 
 # generated java config (machine specific)
 epiSCANEER/coe/generated_conf/
-run_paper500/
+
+# results/ is tracked on purpose: epiSCANEER output is kept in the repo
+# because this container is reclaimed when the session goes idle.
