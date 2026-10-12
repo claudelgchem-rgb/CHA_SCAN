@@ -112,6 +112,8 @@ def main():
     p.add_argument("--out", required=True)
     p.add_argument("--title", default="epiSCANEER report")
     p.add_argument("--sizes", nargs="+", type=int, default=[100, 50])
+    p.add_argument("--all-sheet", action="store_true",
+                   help="also write every row of the shortlist to a sheet named All")
     args = p.parse_args()
 
     with open(args.shortlist) as f:
@@ -133,9 +135,13 @@ def main():
     wb.active.title = "README"
     for n in args.sizes:
         write_sheet(wb.create_sheet("Top%d" % n), rows[:n])
+    if args.all_sheet:
+        write_sheet(wb.create_sheet("All"), rows)
     wb.save(args.out)
-    print("wrote %s | %s" % (args.out, ", ".join("Top%d: %d rows" % (n, min(n, len(rows)))
-                                                 for n in args.sizes)))
+    sheets = ["Top%d: %d rows" % (n, min(n, len(rows))) for n in args.sizes]
+    if args.all_sheet:
+        sheets.append("All: %d rows" % len(rows))
+    print("wrote %s | %s" % (args.out, ", ".join(sheets)))
 
 
 if __name__ == "__main__":

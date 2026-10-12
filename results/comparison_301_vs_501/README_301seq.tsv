@@ -1,0 +1,31 @@
+Analysis	1st analysis (301-sequence MSA). SUPERSEDED - the homolog selection was not the published protocol. Kept for comparison only; use the 501-sequence workbook for decisions.
+Target	Hyaluronidase PH-20 / SPAM1, Homo sapiens, UniProt P38567, 509 aa
+Regions	signal peptide 1-35 | secreted rHuPH20 36-482 | GPI tail 483-509
+Catalytic residue	Glu148 (proton donor, UniProt annotation)
+Method	epiSCANEER (McBASC co-evolution network + epistatic SCI), github.com/khsub87/epiSCANEER
+DEVIATIONS from the paper	Four, all in the homolog selection and none of them part of the published protocol: (1) homologs were taken from a UniProtKB download of Pfam family PF01630 and scored by pairwise local alignment instead of PSI-BLAST against UniRef90; (2) a >=70% query-coverage filter was added, which the paper does not have; (3) a <=90% mutual-identity filter between homologs was added, which the paper does not have; (4) selection stopped at a cap of 300 homologs after a seeded random shuffle, so the set is an arbitrary sample of 4810 candidates and a different seed gives a different set. The paper imposes no cap and no random sampling.
+Homolog set	300 homologs, identity to query 32.6-89.7% (median 44.4%); 241 of the 300 fall in the 40-50% band. Only 20 sequences are shared with the 501-sequence run.
+Alignment	MUSCLE, ClustalW output, default parameters. 301 sequences (query + 300), 1146 columns. Input: input/PH20.aln
+Structure reference	PDB 9JUB chain A (PH20 residues 37-442, deposited in P38567 numbering; verified residue-by-residue, 406/406 match)
+Source rows	928 residue pairs, from 1018 predicted pairs after removing pairs that touch a disulfide cysteine, an N-glycosylation site or the catalytic Glu148
+Ranking	SCI_norm, the min-max normalised epiSCI score. SCI_norm is an exactly linear transform of MUT_SCI, so the two give identical rankings. Structure distance and the region/flag columns are external annotations and do NOT enter the ranking.
+Normalisation range	MUT_SCI -0.39279 to 0.11190. The range is set by this run's own extremes, so SCI_norm values are NOT comparable with another run's. The paper's 0.86 threshold does not transfer: here the top 5% boundary is 0.8123.
+Numbering	P38567 = full-length precursor. mature / rHuPH20 = precursor position - 35, the numbering used in the rHuPH20 patent literature.
+
+Sheets	Top100 and Top50 are the head of the ranking. All holds the complete 928-pair shortlist.
+
+Column definitions	
+pos1 / pos2	Co-evolving residue pair, P38567 numbering
+mature_pos1 / 2	Same pair in mature-protein numbering (= pos - 35)
+WT_AA / MUT_AA	Wild-type residue and the substitution epiSCANEER recommends
+WT_freq	Frequency of the wild-type residue pair across the 301-sequence alignment
+MUT_SCI	Raw epiSCI score of the substitution pair
+SCI_norm	MUT_SCI min-max normalised over all scored substitutions (0-1)
+dist_to_E148	Minimum heavy-atom distance from the residue to catalytic Glu148, in angstrom, measured on PDB 9JUB. Blank when the residue is outside the modelled 37-442 range.
+Near active site	Y when either residue lies within 10 A of Glu148. Those rows are shaded. NOTE: proximity is not evidence of higher activity - the paper's own successful variants sat outside the second shell around the active site.
+
+Caveats	epiSCI ranks epistatic co-evolutionary support, NOT measured activity. All entries are DOUBLE mutants. In the paper, success was defined as a 1.03-fold or greater titer increase, and no correlation between SCI and measured activity is reported.
+Hub concentration	In the top 100 pairs the five biggest hub residues take 53 of the 200 position slots: M35 (14 pairs), V351 (13), L165 (9), F204 (9), S22 (8).
+Run-to-run stability	Only 8 of the top 100 pairs are shared with the 501-sequence run, and the McBASC scores of the two runs correlate at Spearman 0.227 over the 84,666 pairs both scored.
+Literature check	Of the PH20 positions reported as activity-enhancing in the patent literature (mature 69, 70, 271, 309, 324), this run reaches 271 (best rank 18), 309 (rank 60) and 324 (rank 100), and misses 69 and 70 entirely.
+Generated	epiSCANEER rerun of 2026-10-12 from the committed input/PH20.aln; byte-identical to the original 2026-09-18 run (PH20.txt 81,697 bytes)
