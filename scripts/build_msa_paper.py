@@ -266,11 +266,17 @@ def main():
     muscle = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                           "epiSCANEER", "msa_exec", "linux", "muscle")
     clw_out = os.path.join(args.workdir, "%s_muscle.aln" % args.prefix)
+    # MUSCLE reports progress on stderr. Streaming it to a file instead of
+    # buffering it in memory is what makes a long alignment measurable while
+    # it runs; capture_output() hides it until the process exits.
+    progress = os.path.join(args.workdir, "%s_muscle_progress.log" % args.prefix)
+    log("   progress -> %s" % progress)
     t0 = time.time()
-    proc = subprocess.run([muscle, "-in", fasta_in, "-clwout", clw_out],
-                          capture_output=True, text=True)
+    with open(progress, "wb") as perr:
+        proc = subprocess.run([muscle, "-in", fasta_in, "-clwout", clw_out],
+                              stdout=perr, stderr=perr)
     if proc.returncode != 0:
-        sys.exit("MUSCLE failed:\n%s" % proc.stderr[-3000:])
+        sys.exit("MUSCLE failed (returncode %d); see %s" % (proc.returncode, progress))
     log("   MUSCLE finished in %.1f min" % ((time.time() - t0) / 60))
 
     aligned = {r.id: r for r in AlignIO.read(clw_out, "clustal")}
